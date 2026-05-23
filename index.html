@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Vibe</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
         integrity="sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -17,212 +17,237 @@
 
 <body>
 
-    <!-- Navbar -->
-    <nav>
-        <div class="left-half">
-            <div class="logo"><i class="fa-brands fa-itunes"></i></i></div>
-            <div class="home-icon"><i class="fa-solid fa-house-chimney"></i></i></div>
-            <div class="search-bar">
-                <div class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
-                <input type="text" class="input-box" placeholder="What do you want to play?">
-                <div class="browse"><i class="fa-solid fa-folder-open"></i></div>
+    <!-- Auth Pages -->
+    <div id="auth-page" class="page">
+        <!-- Login Page -->
+        <div id="login-page" class="auth-container">
+            <div class="auth-box">
+                <h1>Welcome to Vibe</h1>
+                <p>Your personal music streaming app</p>
+                <form id="login-form">
+                    <input type="email" id="login-email" placeholder="Email" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button type="submit">Log in</button>
+                    <p class="auth-toggle">Don't have an account? <a href="#" onclick="switchAuthPage()">Sign up</a></p>
+                </form>
+                <div id="login-error" class="error-message"></div>
             </div>
         </div>
-        <div class="right-half">
-            <div class="right-half-p1">
-                <p class="nav-text">Premium</p>
-                <p class="nav-text">Support</p>
-                <p class="nav-text">Download</p>
-            </div>
-            <div class="right-half-p2">
-                <div class="nav-text"><i class="fa-regular fa-circle-down"></i> Install App</div>
-                <div class="nav-text">Sign up</div>
-                <button class="login-btn">Log in</button>
-            </div>
-        </div>
-    </nav>
 
-     <!-- Main - left part -->
-    <div class="main">
-        <div class="main-left-part">
-            <div class="library">
-                <p>Your Library</p>
-                <div>+</div>
-            </div>
-
-            <div class="box-container">
-                <div class="box">
-                    <h4>Create your first playlist</h4>
-                    <p>It's easy we'll help you</p>
-                    <button>Create playlist</button>
-                </div>
-                <div class="box">
-                    <div class="box">
-                        <h4>Let's find some podcast to follow</h4>
-                        <p>We'll keep you updated on new updates</p>
-                        <button>Browse podcasts</button>
-                    </div>
-                </div>
-            </div>
-            
-        </div>
-         <!-- Main: right part -->
-
-        <div class="main-right-part">
-            <div class="music-section">
-                <h2>Popular songs</h2>
-                <div class="songs">
-                    <div class="music-card">
-                        <img src="Images/1.jpg">
-                        <div class="music-play-btn"><i id="1" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/2.jpg">
-                        <div class="music-play-btn"><i id="2" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/3.jpg">
-                        <div class="music-play-btn"><i id="3" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/4.jpg">
-                        <div class="music-play-btn"><i id="4" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/5.jpg">
-                        <div class="music-play-btn"><i id="5" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/6.jpg">
-                        <div class="music-play-btn"><i id="6" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="music-section">
-                <h2>Recomended songs</h2>
-                <div class="songs">
-                    <div class="music-card">
-                        <img src="Images/7.jpg">
-                        <div class="music-play-btn"><i id="7" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/8.jpg">
-                        <div class="music-play-btn"><i id="8" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/9.jpg">
-                        <div class="music-play-btn"><i id="9" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/10.jpg">
-                        <div class="music-play-btn"><i id="10" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/11.jpg">
-                        <div class="music-play-btn"><i id="11" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/12.jpg">
-                        <div class="music-play-btn"><i id="12" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="music-section">
-                <h2>Rescently played</h2>
-                <div class="songs">
-                    <div class="music-card">
-                        <img src="Images/13.jpg">
-                        <div class="music-play-btn"><i id="13" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/14.jpg">
-                        <div class="music-play-btn"><i id="14" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/15.jpg">
-                        <div class="music-play-btn"><i id="15" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/16.jpg">
-                        <div class="music-play-btn"><i id="16" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/17.jpg">
-                        <div class="music-play-btn"><i id="17" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                    <div class="music-card">
-                        <img src="Images/18.jpg">
-                        <div class="music-play-btn"><i id="18" class="playMusic fa-solid fa-circle-play"></i></div>
-                        <div class="img-title">Guitar Song</div>
-                        <div class="img-description">The best guitar music to relax your mind</div>
-                    </div>
-                </div>
+        <!-- Signup Page -->
+        <div id="signup-page" class="auth-container hidden">
+            <div class="auth-box">
+                <h1>Create Account</h1>
+                <p>Join Vibe and discover music</p>
+                <form id="signup-form">
+                    <input type="text" id="signup-username" placeholder="Username" required>
+                    <input type="email" id="signup-email" placeholder="Email" required>
+                    <input type="password" id="signup-password" placeholder="Password" required>
+                    <input type="password" id="signup-confirm-password" placeholder="Confirm Password" required>
+                    <button type="submit">Sign up</button>
+                    <p class="auth-toggle">Already have an account? <a href="#" onclick="switchAuthPage()">Log in</a></p>
+                </form>
+                <div id="signup-error" class="error-message"></div>
             </div>
         </div>
     </div>
-    </div>
 
-     <!-- player -->
-    <div class="player-bar">
-        <div class="now-bar">
-            <img src="Images/1.jpg" alt="">
-            <div>
-                <div class="img-title-info">Title 1</div>
-                <div class="img-des-info">this is description for title 1 song</div>
+    <!-- Main App Pages -->
+    <div id="app-page" class="page hidden">
+        <!-- Navbar -->
+        <nav>
+            <div class="left-half">
+                <div class="logo"><i class="fa-brands fa-itunes"></i></div>
+                <div class="home-icon" onclick="showPage('home')"><i class="fa-solid fa-house-chimney"></i></div>
+                <div class="search-bar">
+                    <div class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+                    <input type="text" class="input-box" id="search-input" placeholder="What do you want to play?">
+                    <div class="browse"><i class="fa-solid fa-folder-open"></i></div>
+                </div>
+            </div>
+            <div class="right-half">
+                <label class="theme-toggle">
+                    <input type="checkbox" id="theme-toggle" onchange="toggleTheme()">
+                    <span class="toggle-slider"></span>
+                </label>
+                <button class="profile-btn" onclick="showPage('profile')">
+                    <img id="nav-avatar" src="Images/1.jpg" alt="Profile">
+                </button>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Home Page -->
+        <div id="home-page" class="page-content">
+            <!-- Main - left part -->
+            <div class="main">
+                <div class="main-left-part">
+                    <div class="library">
+                        <p>Your Library</p>
+                        <div class="add-playlist-btn" onclick="showPlaylistModal()">+</div>
+                    </div>
+
+                    <div class="box-container">
+                        <div class="box">
+                            <h4>Create your first playlist</h4>
+                            <p>It's easy we'll help you</p>
+                            <button onclick="showPlaylistModal()">Create playlist</button>
+                        </div>
+                        <div class="box">
+                            <h4>Your Favorites</h4>
+                            <p>Save your favorite songs here</p>
+                            <button onclick="showFavorites()">View Favorites</button>
+                        </div>
+                    </div>
+
+                    <div id="playlists-list" class="playlists-list"></div>
+                </div>
+
+                <!-- Main: right part -->
+                <div class="main-right-part">
+                    <div class="music-section">
+                        <h2>Popular songs</h2>
+                        <div class="songs" id="popular-songs"></div>
+                    </div>
+
+                    <div class="music-section">
+                        <h2>Recommended songs</h2>
+                        <div class="songs" id="recommended-songs"></div>
+                    </div>
+
+                    <div class="music-section">
+                        <h2>Recently played</h2>
+                        <div class="songs" id="recently-played"></div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="music-controller">
-            <div class="player">
-                <div><i id="shuffle" class="player-btns fa-solid fa-shuffle"></i></div>
-                <div><i id="backward" class="player-btns fa-solid fa-backward-step"></i></div>
-                <div><i id="play" class="player-btns fa-solid fa-circle-play"></i></div>
-                <div><i id="forward" class="player-btns fa-solid fa-forward-step"></i></div>
-                <div><i id="repeat" class="player-btns fa-solid fa-repeat"></i></div>
-            </div>
 
-            <div>
-                <input type="range" id="progressBar" value="0">
+        <!-- Favorites Page -->
+        <div id="favorites-page" class="page-content hidden">
+            <div class="content-section">
+                <h1>Your Favorite Songs</h1>
+                <div class="songs" id="favorites-list"></div>
             </div>
         </div>
-        <div></div>
+
+        <!-- Playlist View Page -->
+        <div id="playlist-view-page" class="page-content hidden">
+            <div class="content-section">
+                <h1 id="playlist-title">Playlist</h1>
+                <p id="playlist-desc" class="playlist-description"></p>
+                <div id="playlist-controls" class="playlist-controls">
+                    <button onclick="editCurrentPlaylist()">Edit</button>
+                    <button onclick="deleteCurrentPlaylist()">Delete</button>
+                </div>
+                <div class="songs" id="playlist-songs"></div>
+            </div>
+        </div>
+
+        <!-- Profile Page -->
+        <div id="profile-page" class="page-content hidden">
+            <div class="profile-container">
+                <div class="profile-header">
+                    <img id="profile-avatar" src="Images/1.jpg" alt="Avatar" class="profile-avatar">
+                    <div class="profile-info">
+                        <h1 id="profile-username">User</h1>
+                        <p id="profile-email">email@example.com</p>
+                        <p id="profile-bio">Bio</p>
+                    </div>
+                    <button class="edit-profile-btn" onclick="showEditProfileModal()">Edit Profile</button>
+                </div>
+
+                <div class="profile-stats">
+                    <div class="stat">
+                        <h3 id="stats-songs">0</h3>
+                        <p>Songs Played</p>
+                    </div>
+                    <div class="stat">
+                        <h3 id="stats-time">0</h3>
+                        <p>Hours Listened</p>
+                    </div>
+                    <div class="stat">
+                        <h3 id="stats-playlists">0</h3>
+                        <p>Playlists Created</p>
+                    </div>
+                </div>
+
+                <div class="profile-section">
+                    <h2>Your Playlists</h2>
+                    <div id="profile-playlists" class="playlists-grid"></div>
+                </div>
+
+                <div class="profile-section">
+                    <h2>Top Genres</h2>
+                    <div id="top-genres" class="genres-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player -->
+        <div class="player-bar">
+            <div class="now-bar">
+                <img id="player-img" src="Images/1.jpg" alt="">
+                <div>
+                    <div class="img-title-info" id="player-title">Title</div>
+                    <div class="img-des-info" id="player-artist">Artist</div>
+                </div>
+            </div>
+            <div class="music-controller">
+                <div class="player">
+                    <div><i id="shuffle" class="player-btns fa-solid fa-shuffle"></i></div>
+                    <div><i id="backward" class="player-btns fa-solid fa-backward-step"></i></div>
+                    <div><i id="play" class="player-btns fa-solid fa-circle-play"></i></div>
+                    <div><i id="forward" class="player-btns fa-solid fa-forward-step"></i></div>
+                    <div><i id="repeat" class="player-btns fa-solid fa-repeat"></i></div>
+                </div>
+                <div>
+                    <input type="range" id="progressBar" value="0">
+                </div>
+            </div>
+            <div class="player-controls">
+                <i class="player-btns fa-solid fa-volume-high" id="volume-btn" title="Toggle volume"></i>
+                <i class="player-btns fa-solid fa-heart" id="favorite-btn" onclick="toggleFavorite()"></i>
+            </div>
+        </div>
     </div>
+
+    <!-- Modals -->
+    <!-- Playlist Modal -->
+    <div id="playlist-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="playlist-modal-title">Create Playlist</h2>
+                <button class="close-btn" onclick="closeModal('playlist-modal')">&times;</button>
+            </div>
+            <form id="playlist-form">
+                <input type="text" id="playlist-name" placeholder="Playlist Name" required>
+                <textarea id="playlist-description" placeholder="Description (optional)"></textarea>
+                <label>
+                    <input type="checkbox" id="playlist-public">
+                    Make Public
+                </label>
+                <button type="submit">Create</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="edit-profile-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Profile</h2>
+                <button class="close-btn" onclick="closeModal('edit-profile-modal')">&times;</button>
+            </div>
+            <form id="edit-profile-form">
+                <input type="text" id="edit-bio" placeholder="Bio" maxlength="150">
+                <input type="url" id="edit-avatar" placeholder="Avatar URL">
+                <button type="submit">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
     <script src="script.js"></script>
-    </body>
+</body>
 
 </html>
