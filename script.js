@@ -1,5 +1,9 @@
 // API Configuration
-const API_URL = 'http://localhost:5002/api';
+const LOCAL_API_URL = 'http://localhost:5002/api';
+const DEPLOYED_API_URL = 'https://vibe-5mqi.onrender.com/api';
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? LOCAL_API_URL
+    : DEPLOYED_API_URL;
 const DEFAULT_AVATAR = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
   <rect width="120" height="120" rx="60" fill="#2a2a2a"/>
@@ -101,7 +105,7 @@ async function handleLogin(e) {
             document.getElementById('login-error').innerText = data.message;
         }
     } catch (error) {
-        document.getElementById('login-error').innerText = 'Login failed. Make sure backend is running on port 5002.';
+        document.getElementById('login-error').innerText = 'Login failed. Check backend deployment and API URL.';
     }
 }
 
@@ -135,7 +139,7 @@ async function handleSignup(e) {
             document.getElementById('signup-error').innerText = data.message;
         }
     } catch (error) {
-        document.getElementById('signup-error').innerText = 'Signup failed. Make sure backend is running on port 5002.';
+        document.getElementById('signup-error').innerText = 'Signup failed. Check backend deployment and API URL.';
     }
 }
 
