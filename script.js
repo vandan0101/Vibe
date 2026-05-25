@@ -41,6 +41,7 @@ let playlists = [];
 let audio = new Audio();
 let progressBar = null;
 let play = null;
+let playerBar = null;
 let isShuffleEnabled = false;
 let repeatMode = 'off';
 let lastVolume = Number(localStorage.getItem('playerVolume') || 1);
@@ -59,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         progressBar = document.getElementById('progressBar');
         play = document.getElementById('play');
+        playerBar = document.querySelector('.player-bar');
         initializeEventListeners();
         checkAuthStatus();
     }, 100);
@@ -150,6 +152,7 @@ function showAuthPage() {
     const appPage = document.getElementById('app-page');
     if (authPage) authPage.classList.remove('hidden');
     if (appPage) appPage.classList.add('hidden');
+    setPlayerBarVisibility(false);
 }
 
 function showAppPage() {
@@ -255,6 +258,14 @@ async function loadProfilePage() {
 
             const genresHtml = user.listeningStats.topGenres.map(g => `<span class="genre-tag">${g}</span>`).join('');
             document.getElementById('top-genres').innerHTML = genresHtml || '<p>No genres yet</p>';
+
+            // Load and display playlists
+            await loadPlaylists();
+            displayProfilePlaylists();
+
+            // Load and display favorites
+            await loadFavorites();
+            displayProfileFavorites();
         }
     } catch (error) {
         console.log('Could not load profile from server');
@@ -265,35 +276,112 @@ function showEditProfileModal() {
     document.getElementById('edit-profile-modal').classList.remove('hidden');
     if (currentUser) {
         document.getElementById('edit-bio').value = currentUser.bio || '';
-        document.getElementById('edit-avatar').value = currentUser.avatar || '';
+        document.getElementById('edit-avatar-preview').src = currentUser.avatar || DEFAULT_AVATAR;
     }
+    // Clear file input
+    document.getElementById('edit-avatar-file').value = '';
+}
+
+function handleAvatarFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        e.target.value = '';
+        return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        e.target.value = '';
+        return;
+    }
+
+    // Read and preview/compress
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+            // Compress image
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size to 400x400 max
+            const maxSize = 400;
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > height) {
+                if (width > maxSize) {
+                    height *= maxSize / width;
+                    width = maxSize;
+                }
+            } else {
+                if (height > maxSize) {
+                    width *= maxSize / height;
+                    height = maxSize;
+                }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Convert to base64 with compression
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            document.getElementById('edit-avatar-preview').src = compressedBase64;
+            window.selectedAvatarBase64 = compressedBase64;
+        };
+        img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
 }
 
 async function handleEditProfile(e) {
     e.preventDefault();
-    const bio = document.getElementById('edit-bio').value;
-    const avatar = document.getElementById('edit-avatar').value;
+    const bio = document.getElementById('edit-bio').value.trim();
+    const avatarData = window.selectedAvatarBase64 || (currentUser ? currentUser.avatar : DEFAULT_AVATAR);
+
+    if (!bio) {
+        alert('Please enter a bio');
+        return;
+    }
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
 
     try {
         const token = localStorage.getItem('token');
+        const payload = { bio, avatar: avatarData };
+
         const response = await fetch(`${API_URL}/users/profile`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ bio, avatar })
+            body: JSON.stringify(payload)
         });
 
         const data = await response.json();
         if (data.success) {
             currentUser = data.user;
+            window.selectedAvatarBase64 = null;
+            alert('Profile updated successfully!');
             updateNavbarProfile();
             loadProfilePage();
             closeModal('edit-profile-modal');
+        } else {
+            alert(data.message || 'Failed to update profile');
         }
     } catch (error) {
-        console.log('Could not update profile');
+        console.error('Profile update error:', error);
+        alert('Error updating profile. Please try again.');
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
@@ -382,6 +470,9 @@ function displaySongs(songsToDisplay, containerId) {
             <img src="${song.image}" alt="${song.title}">
             <div class="music-play-btn" onclick="playSong('${song._id}')">
                 <i class="playMusic fa-solid fa-circle-play"></i>
+            </div>
+            <div class="add-to-playlist-btn" onclick="openAddToPlaylistModal('${song._id}', '${song.title}')">
+                <i class="fa-solid fa-plus"></i>
             </div>
             <div class="img-title">${song.title}</div>
             <div class="img-description">${song.artist}</div>
@@ -600,6 +691,44 @@ async function viewPlaylist(playlistId) {
     }
 }
 
+function displayProfilePlaylists() {
+    const container = document.getElementById('profile-playlists');
+    if (!container) return;
+
+    if (!playlists || playlists.length === 0) {
+        container.innerHTML = '<p class="empty-state">No playlists yet. Create one to get started!</p>';
+        return;
+    }
+
+    const html = playlists.map(p => `
+        <div class="playlist-card" onclick="viewPlaylist('${p._id}')">
+            <div class="playlist-cover">
+                <i class="fas fa-music"></i>
+            </div>
+            <div class="playlist-info">
+                <h3 class="playlist-name">${p.name}</h3>
+                <p class="playlist-desc">${p.description || 'No description'}</p>
+                <p class="playlist-count">${p.songs ? p.songs.length : 0} songs</p>
+            </div>
+        </div>
+    `).join('');
+
+    container.innerHTML = html;
+}
+
+function displayProfileFavorites() {
+    const container = document.getElementById('profile-favorites');
+    if (!container) return;
+
+    if (!favorites || favorites.length === 0) {
+        container.innerHTML = '<p class="empty-state">No favorites yet. Add songs to your favorites!</p>';
+        return;
+    }
+
+    const normalizedFavorites = favorites.map(normalizeSong).filter(Boolean);
+    displaySongs(normalizedFavorites, 'profile-favorites');
+}
+
 function editCurrentPlaylist() {
     if (!currentPlaylistId) return;
 }
@@ -618,6 +747,66 @@ async function deleteCurrentPlaylist() {
         showPage('home');
     } catch (error) {
         console.log('Could not delete playlist');
+    }
+}
+
+function openAddToPlaylistModal(songId, songTitle) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        alert('Please login to add songs to playlists');
+        return;
+    }
+
+    window.currentSongToAdd = { songId, songTitle };
+    displayPlaylistsForAdding();
+    document.getElementById('add-to-playlist-modal').classList.remove('hidden');
+}
+
+function displayPlaylistsForAdding() {
+    const container = document.getElementById('playlists-list-modal');
+    if (!playlists || playlists.length === 0) {
+        container.innerHTML = '<p class="empty-state">No playlists yet. Create one to add songs!</p>';
+        return;
+    }
+
+    const html = playlists.map(p => `
+        <div class="playlist-option" onclick="addSongToPlaylist('${p._id}', '${p.name}')">
+            <i class="fa-solid fa-music"></i>
+            <div class="playlist-option-info">
+                <h4>${p.name}</h4>
+                <p>${p.songs ? p.songs.length : 0} songs</p>
+            </div>
+        </div>
+    `).join('');
+
+    container.innerHTML = html;
+}
+
+async function addSongToPlaylist(playlistId, playlistName) {
+    const { songId } = window.currentSongToAdd;
+    const token = localStorage.getItem('token');
+
+    try {
+        const response = await fetch(`${API_URL}/playlists/${playlistId}/songs`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ songId })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            alert(`Song added to "${playlistName}" successfully!`);
+            closeModal('add-to-playlist-modal');
+            loadPlaylists();
+        } else {
+            alert(data.message || 'Failed to add song to playlist');
+        }
+    } catch (error) {
+        console.log('Could not add song to playlist', error);
+        alert('Error adding song to playlist');
     }
 }
 
@@ -691,6 +880,7 @@ async function playSong(songId) {
             audio.load();
             audio.loop = repeatMode === 'one';
             await audio.play();
+            setPlayerBarVisibility(true);
 
             if (play) {
                 play.classList.add('fa-circle-pause');
@@ -703,6 +893,7 @@ async function playSong(songId) {
                 audio.load();
                 audio.loop = repeatMode === 'one';
                 await audio.play();
+                setPlayerBarVisibility(true);
 
                 if (play) {
                     play.classList.add('fa-circle-pause');
@@ -726,6 +917,22 @@ function removeYouTubeEmbed() {
     const playerContainer = document.getElementById('youtube-player-container');
     if (playerContainer) {
         playerContainer.remove();
+    }
+}
+
+function setPlayerBarVisibility(isVisible) {
+    if (!playerBar) {
+        playerBar = document.querySelector('.player-bar');
+    }
+
+    const appPage = document.getElementById('app-page');
+
+    if (playerBar) {
+        playerBar.classList.toggle('player-bar-hidden', !isVisible);
+    }
+
+    if (appPage) {
+        appPage.classList.toggle('player-visible', isVisible);
     }
 }
 
@@ -968,6 +1175,10 @@ function initializeEventListeners() {
     if (signupForm) signupForm.addEventListener('submit', handleSignup);
     if (playlistForm) playlistForm.addEventListener('submit', handleCreatePlaylist);
     if (editProfileForm) editProfileForm.addEventListener('submit', handleEditProfile);
+
+    // Avatar file upload
+    const avatarFileInput = document.getElementById('edit-avatar-file');
+    if (avatarFileInput) avatarFileInput.addEventListener('change', handleAvatarFileSelect);
 
     const progressBarEl = document.getElementById('progressBar');
     const playEl = document.getElementById('play');

@@ -178,6 +178,11 @@
                 </div>
 
                 <div class="profile-section">
+                    <h2>Your Favorites</h2>
+                    <div id="profile-favorites" class="songs"></div>
+                </div>
+
+                <div class="profile-section">
                     <h2>Top Genres</h2>
                     <div id="top-genres" class="genres-list"></div>
                 </div>
@@ -185,7 +190,7 @@
         </div>
 
         <!-- Player -->
-        <div class="player-bar">
+        <div class="player-bar player-bar-hidden">
             <div class="now-bar">
                 <img id="player-img" src="Images/1.jpg" alt="">
                 <div>
@@ -240,10 +245,33 @@
                 <button class="close-btn" onclick="closeModal('edit-profile-modal')">&times;</button>
             </div>
             <form id="edit-profile-form">
+                <div class="avatar-upload-section">
+                    <img id="edit-avatar-preview" src="Images/1.jpg" alt="Avatar Preview" class="avatar-preview">
+                    <div class="upload-controls">
+                        <label for="edit-avatar-file" class="upload-btn">
+                            <i class="fa-solid fa-camera"></i> Choose Image
+                        </label>
+                        <input type="file" id="edit-avatar-file" accept="image/*" style="display: none;">
+                        <p class="upload-hint">JPEG, PNG, or GIF (Max 5MB)</p>
+                    </div>
+                </div>
                 <input type="text" id="edit-bio" placeholder="Bio" maxlength="150">
-                <input type="url" id="edit-avatar" placeholder="Avatar URL">
                 <button type="submit">Save Changes</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Add Song to Playlist Modal -->
+    <div id="add-to-playlist-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add to Playlist</h2>
+                <button class="close-btn" onclick="closeModal('add-to-playlist-modal')">&times;</button>
+            </div>
+            <div class="playlists-select">
+                <div id="playlists-list-modal" class="playlists-modal-list"></div>
+                <button class="create-new-playlist-btn" onclick="showPlaylistModal(); closeModal('add-to-playlist-modal')">+ Create New Playlist</button>
+            </div>
         </div>
     </div>
 
