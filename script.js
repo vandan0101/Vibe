@@ -1,5 +1,5 @@
 // API Configuration
-const API_URL = 'http://localhost:5001/api';
+const API_URL = 'http://localhost:5002/api';
 const DEFAULT_AVATAR = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
   <rect width="120" height="120" rx="60" fill="#2a2a2a"/>
@@ -7,6 +7,8 @@ const DEFAULT_AVATAR = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <path d="M24 102c6-22 24-32 36-32s30 10 36 32" fill="#f4f4f4"/>
 </svg>
 `)}`;
+const API_ORIGIN = API_URL.replace(/\/api$/, '');
+const INITIAL_SONG_LIMIT = 8;
 
 const fallbackSongs = [
     { _id: '1', title: 'Guitar Song 1', artist: 'Artist 1', image: 'Images/1.jpg', audioPath: 'Audio/1.mp3', duration: 180, genre: 'Instrumental' },
@@ -43,7 +45,13 @@ let isShuffleEnabled = false;
 let repeatMode = 'off';
 let lastVolume = Number(localStorage.getItem('playerVolume') || 1);
 
+audio.preload = 'auto';
 audio.volume = Math.max(0, Math.min(1, lastVolume));
+audio.crossOrigin = 'anonymous';
+audio.preload = 'metadata';
+audio.addEventListener('error', () => {
+    console.error('Audio element error', audio.error);
+});
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -91,7 +99,7 @@ async function handleLogin(e) {
             document.getElementById('login-error').innerText = data.message;
         }
     } catch (error) {
-        document.getElementById('login-error').innerText = 'Login failed. Make sure backend is running on port 5001.';
+        document.getElementById('login-error').innerText = 'Login failed. Make sure backend is running on port 5002.';
     }
 }
 
@@ -125,7 +133,7 @@ async function handleSignup(e) {
             document.getElementById('signup-error').innerText = data.message;
         }
     } catch (error) {
-        document.getElementById('signup-error').innerText = 'Signup failed. Make sure backend is running on port 5001.';
+        document.getElementById('signup-error').innerText = 'Signup failed. Make sure backend is running on port 5002.';
     }
 }
 
@@ -150,8 +158,21 @@ function showAppPage() {
     if (authPage) authPage.classList.add('hidden');
     if (appPage) appPage.classList.remove('hidden');
     loadSongs();
-    loadPlaylists();
-    loadFavorites();
+    queueBackgroundLoads();
+}
+
+function queueBackgroundLoads() {
+    const loadDeferredData = () => {
+        loadPlaylists();
+        loadFavorites();
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(loadDeferredData, { timeout: 2000 });
+        return;
+    }
+
+    setTimeout(loadDeferredData, 1200);
 }
 
 function showPage(pageName) {
@@ -280,7 +301,13 @@ async function handleEditProfile(e) {
 
 async function loadSongs() {
     try {
-        const response = await fetch(`${API_URL}/songs`);
+        const searchInput = document.getElementById('search-input');
+        const query = searchInput?.value?.trim() || '';
+        const limit = query ? 18 : INITIAL_SONG_LIMIT;
+        const requestUrl = query
+            ? `${API_URL}/songs?query=${encodeURIComponent(query)}&limit=${limit}`
+            : `${API_URL}/songs?limit=${limit}`;
+        const response = await fetch(requestUrl);
         const data = await response.json();
 
         if (data.success && Array.isArray(data.songs) && data.songs.length > 0) {
@@ -302,18 +329,36 @@ function loadMockSongs() {
     renderSongSections();
 }
 
+function resolveMediaUrl(path) {
+    if (!path) return '';
+    if (/^(https?:)?\/\//i.test(path) || path.startsWith('blob:') || path.startsWith('data:')) {
+        return path;
+    }
+    if (path.startsWith('/')) {
+        return `${API_ORIGIN}${path}`;
+    }
+    return path;
+}
+
 function normalizeSong(song, index = 0) {
     if (!song) return null;
+    const rawAudioPath = song.streamUrl || song.audioPath || (song.youtubeId ? `${API_URL}/songs/${song.youtubeId}/stream` : '');
+    const audioPath = resolveMediaUrl(rawAudioPath);
+    const imagePath = resolveMediaUrl(song.image || `Images/${(index % 18) + 1}.jpg`);
+    const localAudioPath = `Audio/${(index % 18) + 1}.mp3`;
 
     return {
         _id: song._id || song.id || `fallback-${index}`,
+        youtubeId: song.youtubeId || song.id || '',
         title: song.title || 'Unknown Title',
         artist: song.artist || 'Unknown Artist',
         album: song.album || 'Unknown Album',
         genre: song.genre || 'Unknown',
         duration: Number(song.duration) || 180,
-        image: song.image || `Images/${(index % 18) + 1}.jpg`,
-        audioPath: song.audioPath || `Audio/${(index % 18) + 1}.mp3`
+        image: imagePath,
+        audioPath: audioPath || localAudioPath,
+        streamUrl: audioPath || '',
+        localAudioPath
     };
 }
 
@@ -398,6 +443,7 @@ async function loadFavorites() {
 }
 
 async function loadFavoritesPage() {
+    await loadFavorites();
     displaySongs(favorites.map(normalizeSong).filter(Boolean), 'favorites-list');
 }
 
@@ -407,6 +453,10 @@ async function toggleFavorite() {
 
     const isFavorited = favorites.some(f => f._id === currentSong._id);
     const token = localStorage.getItem('token');
+
+    if (token && currentUser && favorites.length === 0) {
+        await loadFavorites();
+    }
 
     if (!token || !currentUser) {
         favorites = isFavorited
@@ -591,21 +641,91 @@ function togglePlay() {
     }
 }
 
-function playSong(songId) {
+async function playSong(songId) {
     const songIndex = songs.findIndex(s => s._id === songId);
     if (songIndex !== -1) {
         currentSongIndex = songIndex;
         const song = songs[songIndex];
-        audio.src = song.audioPath;
-        audio.loop = repeatMode === 'one';
-        audio.play();
-        if (play) {
-            play.classList.add('fa-circle-pause');
-            play.classList.remove('fa-circle-play');
+        const streamUrl = song.streamUrl || song.audioPath || (song.youtubeId ? `${API_URL}/songs/${song.youtubeId}/stream` : '');
+        if (!streamUrl) return;
+
+        removeYouTubeEmbed();
+        audio.pause();
+
+        const sourceUrl = resolveMediaUrl(streamUrl);
+        const fallbackAudioUrl = resolveMediaUrl(song.localAudioPath || `Audio/${(songIndex % 18) + 1}.mp3`);
+
+        try {
+            // If source is backend stream endpoint, probe it first to get final redirected media URL
+            let finalSource = sourceUrl;
+            try {
+                if (/\/api\/songs\/.+\/stream/.test(sourceUrl)) {
+                    console.log('Probing stream endpoint:', sourceUrl);
+                    const probe = await fetch(sourceUrl, { method: 'GET', cache: 'no-store' });
+                    if (probe.ok) {
+                        const ct = probe.headers.get('content-type') || '';
+                        // If backend redirected to a media URL, probe.url will have the final target
+                        if (probe.url && probe.url !== sourceUrl) {
+                            finalSource = probe.url;
+                            console.log('Stream endpoint redirected to:', finalSource);
+                        } else if (ct.includes('application/json')) {
+                            const j = await probe.json().catch(() => null);
+                            if (j && (j.videoUrl || j.youtubeId)) {
+                                const watchUrl = j.videoUrl || `https://www.youtube.com/watch?v=${j.youtubeId}`;
+                                console.warn('Stream endpoint returned a YouTube fallback. Opening watch page instead:', watchUrl);
+                                window.open(watchUrl, '_blank');
+                                return;
+                            }
+                        } else if (ct.includes('audio') || ct.includes('video')) {
+                            finalSource = probe.url || sourceUrl;
+                        }
+                    }
+                }
+            } catch (probeErr) {
+                console.warn('Stream probe failed, will try direct source:', probeErr);
+            }
+
+            audio.src = sourceUrl;
+            // if finalSource differs, prefer it
+            if (finalSource && finalSource !== sourceUrl) audio.src = finalSource;
+            audio.load();
+            audio.loop = repeatMode === 'one';
+            await audio.play();
+
+            if (play) {
+                play.classList.add('fa-circle-pause');
+                play.classList.remove('fa-circle-play');
+            }
+        } catch (error) {
+            console.error('Audio playback failed:', error);
+            try {
+                audio.src = fallbackAudioUrl;
+                audio.load();
+                audio.loop = repeatMode === 'one';
+                await audio.play();
+
+                if (play) {
+                    play.classList.add('fa-circle-pause');
+                    play.classList.remove('fa-circle-play');
+                }
+            } catch (fallbackError) {
+                console.error('Local fallback playback failed:', fallbackError);
+                if (play) {
+                    play.classList.remove('fa-circle-pause');
+                    play.classList.add('fa-circle-play');
+                }
+            }
         }
         updatePlayerUI();
         updateFavoriteButton();
         updateListeningStats(song);
+    }
+}
+
+function removeYouTubeEmbed() {
+    const playerContainer = document.getElementById('youtube-player-container');
+    if (playerContainer) {
+        playerContainer.remove();
     }
 }
 
@@ -767,6 +887,41 @@ audio.addEventListener('timeupdate', () => {
     }
 });
 
+audio.addEventListener('loadedmetadata', () => {
+    if (progressBar) {
+        progressBar.value = 0;
+        progressBar.style.background = 'linear-gradient(to right, #21a600ff 0%, #333 0%)';
+    }
+});
+
+audio.addEventListener('play', () => {
+    if (play) {
+        play.classList.add('fa-circle-pause');
+        play.classList.remove('fa-circle-play');
+    }
+});
+
+audio.addEventListener('pause', () => {
+    if (play) {
+        play.classList.remove('fa-circle-pause');
+        play.classList.add('fa-circle-play');
+    }
+});
+
+audio.addEventListener('error', () => {
+    const failedSong = songs[currentSongIndex];
+    console.error('Audio element error', {
+        currentSrc: audio.currentSrc,
+        networkState: audio.networkState,
+        readyState: audio.readyState,
+        song: failedSong
+    });
+    if (play) {
+        play.classList.remove('fa-circle-pause');
+        play.classList.add('fa-circle-play');
+    }
+});
+
 audio.addEventListener('ended', () => {
     if (repeatMode === 'one') {
         audio.currentTime = 0;
@@ -836,4 +991,14 @@ function initializeEventListeners() {
             if (e.target === modal) modal.classList.add('hidden');
         });
     });
+
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                loadSongs();
+            }
+        });
+    }
 }

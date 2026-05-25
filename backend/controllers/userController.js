@@ -4,10 +4,7 @@ const Song = require('../models/Song');
 exports.getProfile = async (req, res) => {
     try {
         const user = await User.findById(req.user.userId)
-            .populate('favorites')
-            .populate('playlists')
-            .populate('followers')
-            .populate('following');
+            .select('username email avatar bio theme listeningStats favorites playlists recentlyPlayed createdAt');
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });

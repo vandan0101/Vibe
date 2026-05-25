@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const songSchema = new mongoose.Schema({
+    youtubeId: {
+        type: String,
+        unique: true,
+        sparse: true,
+        index: true
+    },
     title: {
         type: String,
         required: true
@@ -28,6 +34,18 @@ const songSchema = new mongoose.Schema({
     audioPath: {
         type: String,
         required: true
+    },
+    streamUrl: {
+        type: String,
+        default: ''
+    },
+    url: {
+        type: String,
+        default: ''
+    },
+    source: {
+        type: String,
+        default: 'youtube'
     },
     plays: {
         type: Number,
