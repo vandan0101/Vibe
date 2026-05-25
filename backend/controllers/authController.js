@@ -2,8 +2,10 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
 const generateToken = (userId) => {
+    const expiresIn = process.env.JWT_EXPIRE || '7d';
+
     return jwt.sign({ userId }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRE
+        expiresIn
     });
 };
 
