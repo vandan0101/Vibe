@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@distube/ytdl": "^2.0.6",
+    "@distube/ytdl-core": "^4.16.12",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
@@ -19,6 +20,7 @@
     "mongodb-memory-server": "^11.1.0",
     "mongoose": "^7.0.0",
     "play-dl": "^1.9.7",
+    "youtubei.js": "^17.0.1",
     "yt-search": "^2.13.1",
     "ytdl-core": "^4.11.5"
   },

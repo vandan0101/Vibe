@@ -1,13 +1,154 @@
 const Song = require('../models/Song');
 const ytSearch = require('yt-search');
-const playdl = require('play-dl');
-const ytdl = require('@distube/ytdl');
+const ytdl = require('@distube/ytdl-core');
 const fs = require('fs');
 const path = require('path');
+const { Readable } = require('stream');
 
 const DEFAULT_QUERY = process.env.DEFAULT_SONG_QUERY || 'music';
 const DEFAULT_INITIAL_LIMIT = 8;
 const MAX_SONG_LIMIT = 18;
+const STREAM_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+const PIPED_API_INSTANCES = [
+    process.env.PIPED_API_BASE,
+    'https://piped.video',
+    'https://pipedapi.kavin.rocks'
+].filter(Boolean);
+
+function serveAudioFileWithRange(filePath, req, res) {
+    if (!fs.existsSync(filePath)) {
+        return false;
+    }
+
+    const stat = fs.statSync(filePath);
+    const total = stat.size;
+    const range = req.headers.range;
+
+    if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+
+        if (start >= total || end >= total) {
+            res.status(416).set({ 'Content-Range': `bytes */${total}` }).end();
+            return true;
+        }
+
+        res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${total}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': end - start + 1,
+            'Content-Type': 'audio/mpeg'
+        });
+
+        fs.createReadStream(filePath, { start, end }).pipe(res);
+        return true;
+    }
+
+    res.writeHead(200, {
+        'Content-Length': total,
+        'Content-Type': 'audio/mpeg',
+        'Accept-Ranges': 'bytes'
+    });
+    fs.createReadStream(filePath).pipe(res);
+    return true;
+}
+
+function getLocalFallbackAudioPath(seed) {
+    const text = String(seed || 'fallback');
+    const code = [...text].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+    const index = (code % 18) + 1;
+    return path.join(__dirname, '..', '..', 'Audio', `${index}.mp3`);
+}
+
+function pickBestPipedAudioStream(audioStreams) {
+    if (!Array.isArray(audioStreams)) return null;
+
+    const candidates = audioStreams.filter((stream) => {
+        if (!stream || !stream.url) return false;
+        if (stream.videoOnly) return false;
+        return true;
+    });
+
+    if (!candidates.length) return null;
+
+    candidates.sort((a, b) => {
+        const aBitrate = Number(a.bitrate) || 0;
+        const bBitrate = Number(b.bitrate) || 0;
+        return bBitrate - aBitrate;
+    });
+
+    return candidates[0];
+}
+
+async function proxyRemoteAudio(remoteUrl, req, res) {
+    const headers = {
+        'User-Agent': STREAM_USER_AGENT
+    };
+
+    if (req.headers.range) {
+        headers.Range = req.headers.range;
+    }
+
+    const upstream = await fetch(remoteUrl, {
+        method: 'GET',
+        headers,
+        redirect: 'follow'
+    });
+
+    if (!upstream.ok || !upstream.body) {
+        throw new Error(`Upstream audio request failed with status ${upstream.status}`);
+    }
+
+    res.status(upstream.status);
+
+    const contentType = upstream.headers.get('content-type') || 'audio/mpeg';
+    res.setHeader('Content-Type', contentType);
+
+    const contentLength = upstream.headers.get('content-length');
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+
+    const contentRange = upstream.headers.get('content-range');
+    if (contentRange) res.setHeader('Content-Range', contentRange);
+
+    const acceptRanges = upstream.headers.get('accept-ranges') || 'bytes';
+    res.setHeader('Accept-Ranges', acceptRanges);
+
+    Readable.fromWeb(upstream.body).pipe(res);
+}
+
+async function streamFromPiped(youtubeId, req, res) {
+    for (const baseUrl of PIPED_API_INSTANCES) {
+        try {
+            const metadataUrl = `${baseUrl.replace(/\/$/, '')}/api/v1/streams/${youtubeId}`;
+            const metadataResponse = await fetch(metadataUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': STREAM_USER_AGENT
+                }
+            });
+
+            if (!metadataResponse.ok) {
+                continue;
+            }
+
+            const metadata = await metadataResponse.json();
+            const bestStream = pickBestPipedAudioStream(metadata.audioStreams);
+
+            if (!bestStream || !bestStream.url) {
+                continue;
+            }
+
+            console.log(`Streaming via Piped instance: ${baseUrl}`);
+            await proxyRemoteAudio(bestStream.url, req, res);
+            return true;
+        } catch (error) {
+            console.warn(`Piped stream failed (${baseUrl}):`, error && error.message ? error.message : error);
+        }
+    }
+
+    return false;
+}
 
 function parseSongLimit(value, fallback) {
     const parsedLimit = Number.parseInt(value, 10);
@@ -44,7 +185,71 @@ function mapVideoToSong(video) {
     };
 }
 
+function mapItunesTrackToSong(track) {
+    if (!track || !track.previewUrl || !track.trackId) return null;
+
+    const artwork = (track.artworkUrl100 || track.artworkUrl60 || '')
+        .replace('100x100bb.jpg', '600x600bb.jpg')
+        .replace('60x60bb.jpg', '600x600bb.jpg');
+
+    return {
+        youtubeId: `itunes-${track.trackId}`,
+        title: track.trackName || 'Unknown Title',
+        artist: track.artistName || 'Unknown Artist',
+        album: track.collectionName || 'Unknown Album',
+        genre: track.primaryGenreName || 'Unknown',
+        duration: Math.max(1, Math.round((Number(track.trackTimeMillis) || 30000) / 1000)),
+        image: artwork || 'https://via.placeholder.com/300?text=Song',
+        audioPath: track.previewUrl,
+        streamUrl: track.previewUrl,
+        url: track.trackViewUrl || '',
+        source: 'itunes'
+    };
+}
+
+async function searchItunes(query, limit = 18) {
+    const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=${limit}`;
+    const response = await fetch(searchUrl, {
+        headers: {
+            'User-Agent': STREAM_USER_AGENT
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error(`iTunes search failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const results = Array.isArray(payload && payload.results) ? payload.results : [];
+    const songs = [];
+
+    for (const track of results) {
+        const songData = mapItunesTrackToSong(track);
+        if (!songData) continue;
+
+        const song = await Song.findOneAndUpdate(
+            { youtubeId: songData.youtubeId },
+            { $set: songData },
+            { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+        );
+
+        songs.push(song);
+    }
+
+    return songs;
+}
+
 async function searchYouTube(query, limit = 18) {
+    // Prefer iTunes preview streams for stable in-site playback.
+    try {
+        const itunesSongs = await searchItunes(query, limit);
+        if (itunesSongs.length > 0) {
+            return itunesSongs;
+        }
+    } catch (itunesError) {
+        console.warn('iTunes search failed, falling back to YouTube:', itunesError.message);
+    }
+
     const searchResult = await ytSearch(query);
     const videos = Array.isArray(searchResult && searchResult.videos) ? searchResult.videos.slice(0, limit) : [];
     const mappedSongs = [];
@@ -183,127 +388,58 @@ exports.streamSong = async (req, res) => {
         console.log('Stream requested for:', youtubeId);
         const videoUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
 
-        // Try getting stream URL from play-dl (most reliable method)
-        try {
-            console.log('Attempting play-dl get_url:', videoUrl);
-            const url = await playdl.video_basic_info(videoUrl)
-                .then(info => {
-                    console.log('Got video info, formats available:', info.video_details?.formats?.length || 0);
-                    if (info && info.video_details && info.video_details.formats) {
-                        const audioFormats = info.video_details.formats.filter(f => f.mimeType && f.mimeType.includes('audio'));
-                        console.log('Audio formats available:', audioFormats.length);
-                        if (audioFormats.length) {
-                            const best = audioFormats.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-                            console.log('Selected audio format with bitrate:', best.bitrate, 'URL exists:', !!best.url);
-                            return best.url;
-                        }
-                    }
-                    return null;
-                })
-                .catch(err => {
-                    console.warn('play-dl basic info failed:', err.message);
-                    return null;
-                });
+        res.setHeader('Cache-Control', 'no-store');
 
-            if (url) {
-                console.log('Streaming extracted URL through server');
-                res.setHeader('Cache-Control', 'no-store');
+        // If the song is in our DB and has a local audioPath, serve the file with Range support
+        const song = await Song.findOne({ $or: [{ _id: youtubeId }, { youtubeId: youtubeId }] }).catch(() => null);
+        if (song && song.audioPath && !/^(https?:)?\/\//i.test(song.audioPath)) {
+            const fileRel = song.audioPath.replace(/^\//, '');
+            const filePath = path.join(__dirname, '..', '..', fileRel);
 
-                // If the song is in our DB and has a local audioPath, serve the file with Range support
-                const song = await Song.findOne({ $or: [{ _id: youtubeId }, { youtubeId: youtubeId }] }).catch(() => null);
-                if (song && song.audioPath && !/^(https?:)?\/\//i.test(song.audioPath)) {
-                    const fileRel = song.audioPath.replace(/^\//, '');
-                    const filePath = path.join(__dirname, '..', '..', fileRel);
+            if (serveAudioFileWithRange(filePath, req, res)) {
+                return;
+            }
+        }
 
-                    if (fs.existsSync(filePath)) {
-                        const stat = fs.statSync(filePath);
-                        const total = stat.size;
-                        const range = req.headers.range;
+        const pipedStreamed = await streamFromPiped(youtubeId, req, res);
+        if (pipedStreamed) {
+            return;
+        }
 
-                        if (range) {
-                            const parts = range.replace(/bytes=/, '').split('-');
-                            const start = parseInt(parts[0], 10);
-                            const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
-                            if (start >= total || end >= total) {
-                                res.status(416).set({ 'Content-Range': `bytes */${total}` }).end();
-                                return;
-                            }
-
-                            res.writeHead(206, {
-                                'Content-Range': `bytes ${start}-${end}/${total}`,
-                                'Accept-Ranges': 'bytes',
-                                'Content-Length': (end - start) + 1,
-                                'Content-Type': 'audio/mpeg'
-                            });
-
-                            const stream = fs.createReadStream(filePath, { start, end });
-                            stream.pipe(res);
-                            return;
-                        }
-
-                        // No range - send entire file
-                        res.writeHead(200, {
-                            'Content-Length': total,
-                            'Content-Type': 'audio/mpeg',
-                            'Accept-Ranges': 'bytes'
-                        });
-                        fs.createReadStream(filePath).pipe(res);
-                        return;
-                    }
-                }
-
-                try {
-                    // Try to stream via play-dl to ensure CORS-friendly streaming
-                    const streamInfo = await playdl.stream(videoUrl).catch(() => null);
-                    if (streamInfo && streamInfo.stream) {
-                        const stream = streamInfo.stream;
-                        const type = streamInfo.type || '';
-                        if (type === 'opus') {
-                            res.setHeader('Content-Type', 'audio/webm; codecs=opus');
-                        } else if (type === 'ogg') {
-                            res.setHeader('Content-Type', 'audio/ogg');
-                        } else {
-                            res.setHeader('Content-Type', 'audio/mpeg');
-                        }
-
-                        stream.pipe(res);
-                        return;
-                    }
-
-                    // Fallback: try ytdl stream
-                    const ytdlStream = ytdl(videoUrl, { filter: 'audioonly', highWaterMark: 1 << 25 });
-                    res.setHeader('Content-Type', 'audio/mpeg');
-                    ytdlStream.pipe(res);
-                    return;
-                } catch (streamErr) {
-                    console.warn('Server-side streaming failed, falling back to redirect:', streamErr);
-                    res.setHeader('Cache-Control', 'no-store');
-                    return res.redirect(url);
+        // Stream YouTube audio directly through the server using ytdl.
+        const ytdlStream = ytdl(videoUrl, {
+            filter: 'audioonly',
+            highWaterMark: 1 << 25,
+            requestOptions: {
+                headers: {
+                    'User-Agent': STREAM_USER_AGENT
                 }
             }
-        } catch (err) {
-            console.warn('play-dl URL extraction failed:', err && err.message ? err.message : err);
-        }
+        });
 
-        // Fallback: use a public API proxy (noembed or similar)
-        try {
-            console.log('Using fallback streaming approach');
-            // Return a player that fetches from a public proxy
-            const proxyUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
-            
-            // Simple HTML5 player redirect - user's browser will handle the video
-            return res.json({
-                success: true,
-                message: 'Streaming via public proxy',
-                videoUrl: proxyUrl,
-                youtubeId: youtubeId
-            });
-        } catch (err) {
-            console.error('Fallback method error:', err);
-        }
+        ytdlStream.on('response', (streamRes) => {
+            const contentType = streamRes.headers['content-type'];
+            if (contentType) {
+                res.setHeader('Content-Type', contentType);
+            } else {
+                res.setHeader('Content-Type', 'audio/mpeg');
+            }
+            res.setHeader('Accept-Ranges', 'bytes');
+        });
 
-        // If everything fails
-        throw new Error('Unable to stream video - all methods failed');
+        ytdlStream.on('error', (streamErr) => {
+            console.error('YouTube stream error:', streamErr && streamErr.message ? streamErr.message : streamErr);
+            if (!res.headersSent) {
+                const fallbackAudioPath = getLocalFallbackAudioPath(youtubeId);
+                if (!serveAudioFileWithRange(fallbackAudioPath, req, res)) {
+                    res.status(500).json({ success: false, message: 'Unable to stream video' });
+                }
+            } else {
+                res.destroy(streamErr);
+            }
+        });
+
+        ytdlStream.pipe(res);
     } catch (error) {
         console.error('Stream error:', error && error.message ? error.message : error);
         res.status(500).json({ success: false, message: 'Unable to stream video' });
